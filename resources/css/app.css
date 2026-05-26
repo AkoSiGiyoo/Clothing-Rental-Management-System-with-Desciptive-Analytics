@@ -1,0 +1,90 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+@source '../**/*.vue';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+    --color-brand-50: #f4f8f2;
+    --color-brand-100: #dfead8;
+    --color-brand-300: #9fc18d;
+    --color-brand-500: #567c49;
+    --color-brand-700: #274327;
+    --color-ink-900: #122018;
+    --color-accent-500: #d18b2f;
+    --color-alert-500: #b24a2d;
+}
+
+@layer base {
+    body {
+        min-height: 100vh;
+        background:
+            radial-gradient(circle at top left, rgba(209, 139, 47, 0.18), transparent 28%),
+            radial-gradient(circle at top right, rgba(86, 124, 73, 0.24), transparent 24%),
+            linear-gradient(180deg, #f6f3ea 0%, #eef1e6 48%, #e4ebdf 100%);
+        color: var(--color-ink-900);
+    }
+
+    ::selection {
+        background: rgba(86, 124, 73, 0.22);
+    }
+}
+
+@layer components {
+    .glass-panel {
+        @apply rounded-[28px] border border-white/60 bg-white/72 shadow-[0_20px_70px_rgba(18,32,24,0.08)] backdrop-blur-xl;
+    }
+
+    .section-title {
+        @apply text-lg font-semibold tracking-[-0.02em] text-[var(--color-ink-900)];
+    }
+
+    .eyebrow {
+        @apply inline-flex items-center rounded-full border border-[var(--color-brand-300)]/50 bg-[var(--color-brand-100)]/60 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-brand-700)];
+    }
+
+    .soft-grid {
+        background-image:
+            linear-gradient(rgba(18, 32, 24, 0.04) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(18, 32, 24, 0.04) 1px, transparent 1px);
+        background-size: 24px 24px;
+    }
+}
+
+@layer utilities {
+    .text-balance {
+        text-wrap: balance;
+    }
+}
+
+@keyframes float-card {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-8px);
+    }
+}
+
+@keyframes pulse-line {
+    0%, 100% {
+        opacity: 0.5;
+        transform: scaleX(0.92);
+    }
+    50% {
+        opacity: 1;
+        transform: scaleX(1);
+    }
+}
+
+.animate-float-card {
+    animation: float-card 7s ease-in-out infinite;
+}
+
+.animate-pulse-line {
+    animation: pulse-line 3.2s ease-in-out infinite;
+}
