@@ -1,4 +1,15 @@
 <script setup>
+defineProps({
+    title: {
+        type: String,
+        default: '',
+    },
+    subtitle: {
+        type: String,
+        default: '',
+    },
+});
+
 defineEmits(['toggle-sidebar']);
 
 </script>
@@ -14,6 +25,11 @@ defineEmits(['toggle-sidebar']);
                 >
                     <i class="fa-solid fa-bars text-sm" aria-hidden="true" />
                 </button>
+
+                <div v-if="title" class="min-w-0">
+                    <p class="text-base font-semibold text-slate-900">{{ title }}</p>
+                    <p v-if="subtitle" class="text-sm text-slate-500">{{ subtitle }}</p>
+                </div>
             </div>
 
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">

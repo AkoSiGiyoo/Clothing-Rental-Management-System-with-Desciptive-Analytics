@@ -1,4 +1,6 @@
 <script setup>
+import { Link } from "@inertiajs/vue3";
+
 defineProps({
     navigation: {
         type: Array,
@@ -11,17 +13,6 @@ defineProps({
 });
 
 const emit = defineEmits(['close']);
-
-const navigation = [
-    { label: 'Dashboard', icon: 'fa-gauge-high', active: true },
-    { label: 'Manage Clothing', icon: 'fa-shirt', active: false },
-    { label: 'Clothing Categories', icon: 'fa-receipt', active: false },
-    { label: 'Inventory', icon: 'fa-shirt', active: false },
-    { label: 'Rental', icon: 'fa-file-lines', active: false },
-    { label: 'Customer', icon: 'fa-rotate-left', active: false },
-    { label: 'Reports & Analytics', icon: 'fa-rotate-left', active: false },
-    { label: 'Payment', icon: 'fa-rotate-left', active: false },
-];
 </script>
 
 <template>
@@ -47,10 +38,10 @@ const navigation = [
         </div>
 
         <nav class="mt-8 space-y-2">
-            <a
+            <Link
                 v-for="item in navigation"
                 :key="item.label"
-                href="#"
+                :href="item.href"
                 class="flex items-center justify-between rounded-2xl px-3 py-3 text-sm font-medium transition"
                 :class="item.active
                     ? 'bg-white text-slate-950'
@@ -65,7 +56,7 @@ const navigation = [
                     v-if="item.active"
                     class="h-2 w-2 rounded-full bg-[var(--color-brand-500)]"
                 />
-            </a>
+            </Link>
         </nav>
     </aside>
 </template>
