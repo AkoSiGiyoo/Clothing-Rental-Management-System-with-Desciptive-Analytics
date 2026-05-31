@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('rental_id')->constrained()->cascadeOnDelete();
-            $table->enum('payment_method', ['cash', 'gcash', 'card', 'bank_transfer']);
+            $table->enum('payment_method', ['cash', 'gcash']);
             $table->enum('payment_status', ['pending', 'partial', 'paid', 'failed', 'refunded'])->default('pending');
             $table->decimal('amount_paid', 10, 2);
             $table->timestamp('paid_at')->nullable();

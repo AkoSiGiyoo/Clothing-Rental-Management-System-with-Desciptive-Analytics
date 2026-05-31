@@ -14,6 +14,7 @@ class ClothingCategoryController extends Controller
 {
     public function index(Request $request): Response
     {
+        // Search term is returned to the page so the filter input stays in sync.
         $search = $request->string('search')->trim()->toString();
 
         $categories = ClothingCategory::query()
@@ -44,6 +45,7 @@ class ClothingCategoryController extends Controller
 
     public function store(StoreClothingCategoryRequest $request): RedirectResponse
     {
+        // Validation is handled by FormRequest; controller focuses on persistence.
         ClothingCategory::create($request->validated());
 
         return back();
@@ -58,6 +60,7 @@ class ClothingCategoryController extends Controller
 
     public function destroy(ClothingCategory $clothingCategory): RedirectResponse
     {
+        // Guard deletion when still referenced by clothing items.
         if ($clothingCategory->clothingItems()->exists()) {
             return back();
         }

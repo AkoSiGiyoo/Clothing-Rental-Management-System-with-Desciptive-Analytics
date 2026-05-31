@@ -18,6 +18,7 @@ class ClothingItemController extends Controller
 {
     public function index(Request $request): Response
     {
+        // Keep search input and server filtering aligned via a normalized query value.
         $search = $request->string('search')->trim()->toString();
 
         $clothingItems = ClothingItem::query()
@@ -48,6 +49,7 @@ class ClothingItemController extends Controller
             })
             ->latest()
             ->get()
+            // Shape data for the Inertia page to avoid exposing model internals directly.
             ->map(fn (ClothingItem $item) => [
                 'id' => $item->id,
                 'category_id' => $item->clothing_category_id,
@@ -87,8 +89,10 @@ class ClothingItemController extends Controller
     public function store(StoreClothingItemRequest $request): RedirectResponse
     {
         $validated = $request->validated();
+        // Store uploaded image first so we can persist only the final storage path.
         $imagePath = $request->file('image')?->store('clothing-items', 'public');
 
+        // Create clothing + initial inventory atomically.
         DB::transaction(function () use ($validated, $imagePath) {
             $clothingItem = ClothingItem::create([
                 'clothing_category_id' => $validated['clothing_category_id'],
@@ -113,11 +117,13 @@ class ClothingItemController extends Controller
         $validated = $request->validated();
         $imagePath = $clothing->image_path;
 
+        // Explicit remove toggle from UI removes current image even without a replacement.
         if ($request->boolean('remove_image') && $imagePath) {
             Storage::disk('public')->delete($imagePath);
             $imagePath = null;
         }
 
+        // Replacing image deletes the old file to avoid orphaned storage files.
         if ($request->hasFile('image')) {
             if ($imagePath) {
                 Storage::disk('public')->delete($imagePath);
@@ -159,6 +165,7 @@ class ClothingItemController extends Controller
 
     private function resolveImageUrl(?string $imagePath): ?string
     {
+        // Normalize different path formats into a browser-safe /storage URL.
         if (! $imagePath) {
             return null;
         }

@@ -4,6 +4,7 @@ import { Head, router, useForm } from "@inertiajs/vue3";
 import AdminNavbar from "../components/AdminNavbar.vue";
 import AdminSidebar from "../components/AdminSidebar.vue";
 import AppDataTable from "../components/AppDataTable.vue";
+import AppModal from "../components/AppModal.vue";
 import { buildAdminNavigation } from "../data/adminNavigation";
 
 const props = defineProps({
@@ -49,13 +50,17 @@ const emptyState = {
 const form = useForm({ ...emptyState });
 
 const hasCategories = computed(() => props.categories.length > 0);
-const formTitle = computed(() => (editingId.value ? "Edit clothing item" : "Add clothing item"));
+const formTitle = computed(() =>
+    editingId.value ? "Edit clothing item" : "Add clothing item",
+);
 const formDescription = computed(() =>
     editingId.value
         ? "Update the selected clothing record and image."
         : "Create a new clothing record and upload an image.",
 );
-const imagePreviewLabel = computed(() => (editingId.value ? "Current image" : "Image preview"));
+const imagePreviewLabel = computed(() =>
+    editingId.value ? "Current image" : "Image preview",
+);
 
 const statusClasses = {
     available: "bg-[var(--color-brand-100)]/70 text-[var(--color-brand-700)]",
@@ -74,6 +79,7 @@ const clothingTableColumns = [
 ];
 
 function resetForm() {
+    // Normalize form state for both create flow and post-submit cleanup.
     form.defaults({ ...emptyState });
     form.reset();
     form.clearErrors();
@@ -91,6 +97,7 @@ function openCreate() {
 }
 
 function openEdit(item) {
+    // Pre-fill modal inputs from the selected row and keep image optional.
     editingId.value = item.id;
     form.defaults({
         clothing_category_id: item.category_id,
@@ -120,6 +127,7 @@ function closeForm() {
 }
 
 function submit() {
+    // forceFormData is required because this form can include a file upload.
     const options = {
         preserveScroll: true,
         forceFormData: true,
@@ -127,12 +135,10 @@ function submit() {
     };
 
     if (editingId.value) {
-        form
-            .transform((data) => ({
-                ...data,
-                _method: "put",
-            }))
-            .post(`/clothing/${editingId.value}`, options);
+        form.transform((data) => ({
+            ...data,
+            _method: "put",
+        })).post(`/clothing/${editingId.value}`, options);
         return;
     }
 
@@ -140,6 +146,7 @@ function submit() {
 }
 
 function updateImage(event) {
+    // Keep preview in sync with selection and preserve existing image on empty input.
     const [file] = event.target.files ?? [];
 
     form.image = file ?? null;
@@ -147,7 +154,8 @@ function updateImage(event) {
 
     if (!file) {
         imagePreview.value = editingId.value
-            ? props.clothingItems.find((item) => item.id === editingId.value)?.image_url ?? null
+            ? (props.clothingItems.find((item) => item.id === editingId.value)
+                  ?.image_url ?? null)
             : null;
         return;
     }
@@ -156,6 +164,7 @@ function updateImage(event) {
 }
 
 function removeImageSelection() {
+    // Flag remove_image so backend can delete existing stored image on update.
     form.image = null;
     form.remove_image = true;
     imagePreview.value = null;
@@ -196,200 +205,238 @@ function applySearch() {
     <Head title="Manage Clothing" />
 
     <main class="h-screen overflow-hidden bg-slate-100 text-slate-900">
+        <!-- Mobile-only overlay used when the admin sidebar is open. -->
         <div
             v-if="sidebarOpen"
             class="fixed inset-0 z-30 bg-slate-950/50 lg:hidden"
             @click="sidebarOpen = false"
         />
 
-        <div
-            v-if="formOpen"
-            class="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 px-4 py-6 backdrop-blur-[2px] sm:px-6"
-            @click.self="closeForm"
+        <!-- Reusable modal for creating and editing clothing records. -->
+        <AppModal
+            :open="formOpen"
+            :title="formTitle"
+            :subtitle="formDescription"
+            max-width-class="max-w-3xl"
+            panel-class="max-h-[90vh] overflow-y-auto"
+            body-class="px-6 py-6"
+            @close="closeForm"
         >
-            <div class="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[32px] bg-white shadow-2xl">
-                <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
-                    <div>
-                        <p class="text-lg font-semibold tracking-[-0.02em] text-slate-900">
-                            {{ formTitle }}
+            <form class="space-y-5" @submit.prevent="submit">
+                <!-- Main clothing form fields. -->
+                <div class="grid gap-5 sm:grid-cols-2">
+                    <label class="block sm:col-span-2">
+                        <span class="text-sm font-medium text-slate-700"
+                            >Clothing name</span
+                        >
+                        <input
+                            v-model="form.name"
+                            type="text"
+                            class="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[var(--color-brand-500)]"
+                        />
+                        <p
+                            v-if="form.errors.name"
+                            class="mt-2 text-sm text-[var(--color-alert-500)]"
+                        >
+                            {{ form.errors.name }}
                         </p>
-                        <p class="mt-1 text-sm text-slate-500">
-                            {{ formDescription }}
+                    </label>
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700"
+                            >Category</span
+                        >
+                        <select
+                            v-model="form.clothing_category_id"
+                            class="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[var(--color-brand-500)]"
+                            :disabled="!hasCategories"
+                        >
+                            <option value="">Select category</option>
+                            <option
+                                v-for="category in categories"
+                                :key="category.id"
+                                :value="category.id"
+                            >
+                                {{ category.name }}
+                            </option>
+                        </select>
+                        <p
+                            v-if="form.errors.clothing_category_id"
+                            class="mt-2 text-sm text-[var(--color-alert-500)]"
+                        >
+                            {{ form.errors.clothing_category_id }}
                         </p>
-                    </div>
-                    <button
-                        type="button"
-                        class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 text-slate-500"
-                        @click="closeForm"
+                    </label>
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700"
+                            >Status</span
+                        >
+                        <select
+                            v-model="form.status"
+                            class="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[var(--color-brand-500)]"
+                        >
+                            <option value="available">Available</option>
+                            <option value="reserved">Reserved</option>
+                            <option value="rented">Rented</option>
+                            <option value="maintenance">Maintenance</option>
+                        </select>
+                        <p
+                            v-if="form.errors.status"
+                            class="mt-2 text-sm text-[var(--color-alert-500)]"
+                        >
+                            {{ form.errors.status }}
+                        </p>
+                    </label>
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700"
+                            >Rental price</span
+                        >
+                        <input
+                            v-model="form.rental_price"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            class="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[var(--color-brand-500)]"
+                        />
+                        <p
+                            v-if="form.errors.rental_price"
+                            class="mt-2 text-sm text-[var(--color-alert-500)]"
+                        >
+                            {{ form.errors.rental_price }}
+                        </p>
+                    </label>
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700"
+                            >Brand</span
+                        >
+                        <input
+                            v-model="form.brand"
+                            type="text"
+                            class="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[var(--color-brand-500)]"
+                        />
+                        <p
+                            v-if="form.errors.brand"
+                            class="mt-2 text-sm text-[var(--color-alert-500)]"
+                        >
+                            {{ form.errors.brand }}
+                        </p>
+                    </label>
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700"
+                            >Color</span
+                        >
+                        <input
+                            v-model="form.color"
+                            type="text"
+                            class="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[var(--color-brand-500)]"
+                        />
+                    </label>
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700"
+                            >Size</span
+                        >
+                        <input
+                            v-model="form.size"
+                            type="text"
+                            class="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[var(--color-brand-500)]"
+                        />
+                    </label>
+
+                    <label class="block sm:col-span-2">
+                        <span class="text-sm font-medium text-slate-700"
+                            >Clothing image</span
+                        >
+                        <input
+                            ref="imageInput"
+                            type="file"
+                            accept="image/png,image/jpeg,image/jpg,image/webp"
+                            class="mt-2 block w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition file:mr-4 file:rounded-full file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white focus:border-[var(--color-brand-500)]"
+                            @change="updateImage"
+                        />
+                        <p class="mt-2 text-xs text-slate-500">
+                            Upload JPG, PNG, or WEBP up to 2 MB.
+                        </p>
+                        <p
+                            v-if="form.errors.image"
+                            class="mt-2 text-sm text-[var(--color-alert-500)]"
+                        >
+                            {{ form.errors.image }}
+                        </p>
+                    </label>
+
+                    <!-- Image preview panel reflects current upload or stored image. -->
+                    <div
+                        class="sm:col-span-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4"
                     >
-                        <i class="fa-solid fa-xmark" aria-hidden="true" />
-                    </button>
-                </div>
-
-                <form class="space-y-5 px-6 py-6" @submit.prevent="submit">
-                    <div class="grid gap-5 sm:grid-cols-2">
-                        <label class="block sm:col-span-2">
-                            <span class="text-sm font-medium text-slate-700">Clothing name</span>
-                            <input
-                                v-model="form.name"
-                                type="text"
-                                class="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[var(--color-brand-500)]"
-                            />
-                            <p v-if="form.errors.name" class="mt-2 text-sm text-[var(--color-alert-500)]">
-                                {{ form.errors.name }}
-                            </p>
-                        </label>
-
-                        <label class="block">
-                            <span class="text-sm font-medium text-slate-700">Category</span>
-                            <select
-                                v-model="form.clothing_category_id"
-                                class="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[var(--color-brand-500)]"
-                                :disabled="!hasCategories"
-                            >
-                                <option value="">Select category</option>
-                                <option
-                                    v-for="category in categories"
-                                    :key="category.id"
-                                    :value="category.id"
-                                >
-                                    {{ category.name }}
-                                </option>
-                            </select>
-                            <p v-if="form.errors.clothing_category_id" class="mt-2 text-sm text-[var(--color-alert-500)]">
-                                {{ form.errors.clothing_category_id }}
-                            </p>
-                        </label>
-
-                        <label class="block">
-                            <span class="text-sm font-medium text-slate-700">Status</span>
-                            <select
-                                v-model="form.status"
-                                class="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[var(--color-brand-500)]"
-                            >
-                                <option value="available">Available</option>
-                                <option value="reserved">Reserved</option>
-                                <option value="rented">Rented</option>
-                                <option value="maintenance">Maintenance</option>
-                            </select>
-                            <p v-if="form.errors.status" class="mt-2 text-sm text-[var(--color-alert-500)]">
-                                {{ form.errors.status }}
-                            </p>
-                        </label>
-
-                        <label class="block">
-                            <span class="text-sm font-medium text-slate-700">Rental price</span>
-                            <input
-                                v-model="form.rental_price"
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                class="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[var(--color-brand-500)]"
-                            />
-                            <p v-if="form.errors.rental_price" class="mt-2 text-sm text-[var(--color-alert-500)]">
-                                {{ form.errors.rental_price }}
-                            </p>
-                        </label>
-
-                        <label class="block">
-                            <span class="text-sm font-medium text-slate-700">Brand</span>
-                            <input
-                                v-model="form.brand"
-                                type="text"
-                                class="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[var(--color-brand-500)]"
-                            />
-                            <p v-if="form.errors.brand" class="mt-2 text-sm text-[var(--color-alert-500)]">
-                                {{ form.errors.brand }}
-                            </p>
-                        </label>
-
-                        <label class="block">
-                            <span class="text-sm font-medium text-slate-700">Color</span>
-                            <input
-                                v-model="form.color"
-                                type="text"
-                                class="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[var(--color-brand-500)]"
-                            />
-                        </label>
-
-                        <label class="block">
-                            <span class="text-sm font-medium text-slate-700">Size</span>
-                            <input
-                                v-model="form.size"
-                                type="text"
-                                class="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[var(--color-brand-500)]"
-                            />
-                        </label>
-
-                        <label class="block sm:col-span-2">
-                            <span class="text-sm font-medium text-slate-700">Clothing image</span>
-                            <input
-                                ref="imageInput"
-                                type="file"
-                                accept="image/png,image/jpeg,image/jpg,image/webp"
-                                class="mt-2 block w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition file:mr-4 file:rounded-full file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white focus:border-[var(--color-brand-500)]"
-                                @change="updateImage"
-                            />
-                            <p class="mt-2 text-xs text-slate-500">
-                                Upload JPG, PNG, or WEBP up to 2 MB.
-                            </p>
-                            <p v-if="form.errors.image" class="mt-2 text-sm text-[var(--color-alert-500)]">
-                                {{ form.errors.image }}
-                            </p>
-                        </label>
-
-                        <div class="sm:col-span-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
-                            <div class="flex items-start justify-between gap-4">
-                                <div>
-                                    <p class="text-sm font-medium text-slate-700">{{ imagePreviewLabel }}</p>
-                                    <p class="mt-1 text-sm text-slate-500">
-                                        Add a thumbnail for the clothing item listing.
-                                    </p>
-                                </div>
-                                <button
-                                    v-if="imagePreview"
-                                    type="button"
-                                    class="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600"
-                                    @click="removeImageSelection"
-                                >
-                                    Remove image
-                                </button>
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <p class="text-sm font-medium text-slate-700">
+                                    {{ imagePreviewLabel }}
+                                </p>
+                                <p class="mt-1 text-sm text-slate-500">
+                                    Add a thumbnail for the clothing item
+                                    listing.
+                                </p>
                             </div>
+                            <button
+                                v-if="imagePreview"
+                                type="button"
+                                class="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600"
+                                @click="removeImageSelection"
+                            >
+                                Remove image
+                            </button>
+                        </div>
 
-                            <div class="mt-4 flex h-48 items-center justify-center overflow-hidden rounded-2xl bg-white">
-                                <img
-                                    v-if="imagePreview"
-                                    :src="imagePreview"
-                                    alt="Clothing preview"
-                                    class="h-full w-full object-cover"
-                                >
-                                <div v-else class="text-center text-sm text-slate-400">
-                                    No image selected
-                                </div>
+                        <div
+                            class="mt-4 flex h-48 items-center justify-center overflow-hidden rounded-2xl bg-white"
+                        >
+                            <img
+                                v-if="imagePreview"
+                                :src="imagePreview"
+                                alt="Clothing preview"
+                                class="h-full w-full object-cover"
+                            />
+                            <div
+                                v-else
+                                class="text-center text-sm text-slate-400"
+                            >
+                                No image selected
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <div class="sticky bottom-0 flex items-center justify-end gap-3 border-t border-slate-200 bg-white pt-5">
-                        <button
-                            type="button"
-                            class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
-                            @click="closeForm"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            class="rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-                            :disabled="form.processing"
-                        >
-                            {{ editingId ? "Save changes" : "Create clothing item" }}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+                <!-- Sticky action row keeps save/cancel visible in the tall modal. -->
+                <div
+                    class="sticky bottom-0 flex items-center justify-end gap-3 border-t border-slate-200 bg-white pt-5"
+                >
+                    <button
+                        type="button"
+                        class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
+                        @click="closeForm"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        class="rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                        :disabled="form.processing"
+                    >
+                        {{
+                            editingId ? "Save changes" : "Create clothing item"
+                        }}
+                    </button>
+                </div>
+            </form>
+        </AppModal>
 
+        <!-- Main admin shell: sidebar navigation on the left, page content on the right. -->
         <div class="grid h-full lg:grid-cols-[260px_minmax(0,1fr)]">
             <AdminSidebar
                 :navigation="navigation"
@@ -405,37 +452,74 @@ function applySearch() {
                 />
 
                 <div class="px-4 py-6 sm:px-6 lg:px-8">
+                    <!-- Summary cards for the current clothing inventory status. -->
                     <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                         <article class="glass-panel p-5">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Total items</p>
-                            <p class="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-900">{{ stats.total }}</p>
+                            <p
+                                class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+                            >
+                                Total items
+                            </p>
+                            <p
+                                class="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-900"
+                            >
+                                {{ stats.total }}
+                            </p>
                         </article>
                         <article class="glass-panel p-5">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Available</p>
-                            <p class="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--color-brand-700)]">{{ stats.available }}</p>
+                            <p
+                                class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+                            >
+                                Available
+                            </p>
+                            <p
+                                class="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--color-brand-700)]"
+                            >
+                                {{ stats.available }}
+                            </p>
                         </article>
                         <article class="glass-panel p-5">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Rented</p>
-                            <p class="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-900">{{ stats.rented }}</p>
+                            <p
+                                class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+                            >
+                                Rented
+                            </p>
+                            <p
+                                class="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-900"
+                            >
+                                {{ stats.rented }}
+                            </p>
                         </article>
                         <article class="glass-panel p-5">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Low stock</p>
-                            <p class="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--color-alert-500)]">{{ stats.low_stock }}</p>
+                            <p
+                                class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+                            >
+                                Low stock
+                            </p>
+                            <p
+                                class="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--color-alert-500)]"
+                            >
+                                {{ stats.low_stock }}
+                            </p>
                         </article>
                     </section>
 
+                    <!-- Main content area with filters, actions, and the clothing list. -->
                     <section class="glass-panel mt-6 p-5 sm:p-6">
-                        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div
+                            class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
+                        >
                             <div class="min-w-0">
-                                <span class="eyebrow">Clothing Catalog</span>
-                                <p class="section-title mt-3">Manage cloth records</p>
-                                <p class="mt-1 text-sm text-slate-500">
-                                    The page supports full CRUD for clothing items and current inventory quantity.
-                                </p>
+                                <span class="eyebrow">List of clothing</span>
                             </div>
 
-                            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-                                <form class="flex items-center gap-2" @submit.prevent="applySearch">
+                            <div
+                                class="flex flex-col gap-3 sm:flex-row sm:items-center"
+                            >
+                                <form
+                                    class="flex items-center gap-2"
+                                    @submit.prevent="applySearch"
+                                >
                                     <input
                                         v-model="search"
                                         type="text"
@@ -460,14 +544,20 @@ function applySearch() {
                             </div>
                         </div>
 
+                        <!-- Warning state when categories are missing and new items cannot be assigned properly. -->
                         <div
                             v-if="!hasCategories"
                             class="mt-5 rounded-2xl border border-[var(--color-accent-500)]/25 bg-[rgba(209,139,47,0.08)] px-4 py-3 text-sm text-slate-700"
                         >
-                            No categories exist yet. Click `Add clothing` and create a category from the modal first.
+                            No categories exist yet. Click `Add clothing` and
+                            create a category from the modal first.
                         </div>
 
-                        <div v-if="clothingItems.length" class="mt-6 overflow-hidden rounded-[24px] border border-slate-200 bg-white">
+                        <!-- Data table shown when at least one clothing item exists. -->
+                        <div
+                            v-if="clothingItems.length"
+                            class="mt-6 overflow-hidden rounded-[24px] border border-slate-200 bg-white"
+                        >
                             <AppDataTable
                                 :items="clothingItems"
                                 :columns="clothingTableColumns"
@@ -475,25 +565,36 @@ function applySearch() {
                             >
                                 <template #cell-name="{ item }">
                                     <div class="text-left">
-                                        <p class="font-semibold text-slate-900">{{ item.name }}</p>
+                                        <p class="font-semibold text-slate-900">
+                                            {{ item.name }}
+                                        </p>
                                         <p class="mt-1 text-sm text-slate-500">
                                             {{ item.brand || "No brand" }}
-                                            <span v-if="item.color || item.size">
-                                                - {{ item.color || "No color" }} / {{ item.size || "No size" }}
+                                            <span
+                                                v-if="item.color || item.size"
+                                            >
+                                                -
+                                                {{ item.color || "No color" }} /
+                                                {{ item.size || "No size" }}
                                             </span>
                                         </p>
                                     </div>
                                 </template>
 
                                 <template #cell-image_url="{ item }">
-                                    <div class="h-16 w-16 overflow-hidden rounded-2xl bg-slate-100">
+                                    <div
+                                        class="h-16 w-16 overflow-hidden rounded-2xl bg-slate-100"
+                                    >
                                         <img
-                                            v-if="item.image_url && !brokenImageIds.has(item.id)"
+                                            v-if="
+                                                item.image_url &&
+                                                !brokenImageIds.has(item.id)
+                                            "
                                             :src="item.image_url"
                                             :alt="item.name"
                                             class="h-full w-full object-cover"
                                             @error="markImageBroken(item.id)"
-                                        >
+                                        />
                                         <div
                                             v-else
                                             class="flex h-full w-full items-center justify-center text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400"
@@ -504,11 +605,16 @@ function applySearch() {
                                 </template>
 
                                 <template #cell-category_name="{ item }">
-                                    <span class="text-sm text-slate-600">{{ item.category_name }}</span>
+                                    <span class="text-sm text-slate-600">{{
+                                        item.category_name
+                                    }}</span>
                                 </template>
 
                                 <template #cell-rental_price="{ item }">
-                                    <span class="text-sm font-medium text-slate-900">PHP {{ item.rental_price }}</span>
+                                    <span
+                                        class="text-sm font-medium text-slate-900"
+                                        >PHP {{ item.rental_price }}</span
+                                    >
                                 </template>
 
                                 <template #cell-status="{ item }">
@@ -541,13 +647,17 @@ function applySearch() {
                             </AppDataTable>
                         </div>
 
+                        <!-- Empty state shown when the list has no items or search results. -->
                         <div
                             v-else
                             class="soft-grid mt-6 rounded-[24px] border border-dashed border-slate-300 bg-white/65 px-6 py-12 text-center"
                         >
-                            <p class="text-lg font-semibold text-slate-900">No clothing items found</p>
+                            <p class="text-lg font-semibold text-slate-900">
+                                No clothing items found
+                            </p>
                             <p class="mt-2 text-sm text-slate-500">
-                                Create your first clothing record or adjust the search filter.
+                                Create your first clothing record or adjust the
+                                search filter.
                             </p>
                         </div>
                     </section>
