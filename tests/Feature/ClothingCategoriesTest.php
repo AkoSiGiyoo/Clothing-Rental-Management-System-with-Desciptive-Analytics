@@ -74,7 +74,6 @@ class ClothingCategoriesTest extends TestCase
             'color' => 'Black',
             'size' => 'M',
             'image_path' => null,
-            'brand' => 'Studio',
             'status' => 'available',
         ]);
 

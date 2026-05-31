@@ -21,6 +21,17 @@ class ClothingItemController extends Controller
         $search = $request->string('search')->trim()->toString();
 
         $clothingItems = ClothingItem::query()
+            ->select([
+                'id',
+                'clothing_category_id',
+                'name',
+                'rental_price',
+                'color',
+                'size',
+                'image_path',
+                'status',
+                'created_at',
+            ])
             ->with([
                 'category:id,name',
                 'inventory:id,clothing_item_id,quantity',
@@ -29,7 +40,6 @@ class ClothingItemController extends Controller
                 $query->where(function ($subQuery) use ($search) {
                     $subQuery
                         ->where('name', 'like', "%{$search}%")
-                        ->orWhere('brand', 'like', "%{$search}%")
                         ->orWhere('color', 'like', "%{$search}%")
                         ->orWhere('size', 'like', "%{$search}%")
                         ->orWhere('status', 'like', "%{$search}%")
@@ -41,6 +51,10 @@ class ClothingItemController extends Controller
             ->map(fn (ClothingItem $item) => [
                 'id' => $item->id,
                 'category_id' => $item->clothing_category_id,
+                'category' => $item->category ? [
+                    'id' => $item->category->id,
+                    'name' => $item->category->name,
+                ] : null,
                 'category_name' => $item->category?->name,
                 'name' => $item->name,
                 'rental_price' => number_format((float) $item->rental_price, 2, '.', ''),
@@ -49,7 +63,6 @@ class ClothingItemController extends Controller
                 'size' => $item->size,
                 'image_path' => $item->image_path,
                 'image_url' => $this->resolveImageUrl($item->image_path),
-                'brand' => $item->brand,
                 'status' => $item->status,
                 'created_at' => $item->created_at?->format('M d, Y'),
             ]);
@@ -84,12 +97,11 @@ class ClothingItemController extends Controller
                 'color' => $validated['color'] ?? null,
                 'size' => $validated['size'] ?? null,
                 'image_path' => $imagePath,
-                'brand' => $validated['brand'] ?? null,
                 'status' => $validated['status'],
             ]);
 
             $clothingItem->inventory()->create([
-                'quantity' => $validated['quantity'],
+                'quantity' => 0,
             ]);
         });
 
@@ -122,13 +134,12 @@ class ClothingItemController extends Controller
                 'color' => $validated['color'] ?? null,
                 'size' => $validated['size'] ?? null,
                 'image_path' => $imagePath,
-                'brand' => $validated['brand'] ?? null,
                 'status' => $validated['status'],
             ]);
 
-            $clothing->inventory()->updateOrCreate(
+            $clothing->inventory()->firstOrCreate(
                 ['clothing_item_id' => $clothing->id],
-                ['quantity' => $validated['quantity']],
+                ['quantity' => 0],
             );
         });
 
@@ -152,10 +163,26 @@ class ClothingItemController extends Controller
             return null;
         }
 
-        if (str_starts_with($imagePath, 'http://') || str_starts_with($imagePath, 'https://')) {
-            return $imagePath;
+        $normalizedPath = str_replace('\\', '/', $imagePath);
+        $baseUrl = rtrim(request()->getBaseUrl(), '/');
+        $storagePrefix = ($baseUrl !== '' ? $baseUrl : '').'/storage/';
+
+        if (str_starts_with($normalizedPath, 'http://') || str_starts_with($normalizedPath, 'https://')) {
+            return $normalizedPath;
         }
 
-        return Storage::disk('public')->url($imagePath);
+        if (str_starts_with($normalizedPath, '/storage/')) {
+            return ($baseUrl !== '' ? $baseUrl : '').$normalizedPath;
+        }
+
+        if (str_starts_with($normalizedPath, 'storage/')) {
+            return $storagePrefix.substr($normalizedPath, 8);
+        }
+
+        if (str_starts_with($normalizedPath, 'public/')) {
+            $normalizedPath = substr($normalizedPath, 7);
+        }
+
+        return $storagePrefix.ltrim($normalizedPath, '/');
     }
 }

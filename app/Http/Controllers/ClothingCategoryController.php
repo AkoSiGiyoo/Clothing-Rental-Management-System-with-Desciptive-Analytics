@@ -17,6 +17,7 @@ class ClothingCategoryController extends Controller
         $search = $request->string('search')->trim()->toString();
 
         $categories = ClothingCategory::query()
+            ->select(['id', 'name', 'created_at'])
             ->withCount('clothingItems')
             ->when($search !== '', fn ($query) => $query->where('name', 'like', "%{$search}%"))
             ->orderBy('name')

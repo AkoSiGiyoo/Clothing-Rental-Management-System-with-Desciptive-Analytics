@@ -20,7 +20,6 @@ return new class extends Migration
             $table->unsignedInteger('quantity')->default(1);
             $table->decimal('price', 10, 2);
             $table->timestamps();
-
             $table->unique(['rental_id', 'clothing_item_id']);
         });
     }

@@ -13,15 +13,18 @@ return new class extends Migration
     {
         Schema::create('rentals', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->restrictOnDelete();
+            $table->foreignId('user_id')
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete();
             $table->date('rental_date');
             $table->date('due_date');
-            $table->date('returned_at')->nullable();
+            $table->date('returned_date')->nullable();
+            $table->enum('status', ['pending', 'active', 'completed', 'overdue', 'cancelled'])->default('pending');
             $table->decimal('total_amount', 10, 2)->default(0);
-            $table->enum('status', ['pending', 'active', 'returned', 'overdue', 'cancelled'])->default('pending');
             $table->timestamps();
 
-            $table->index(['user_id', 'status']);
+            $table->index(['status', 'due_date']);
         });
     }
 
@@ -33,3 +36,4 @@ return new class extends Migration
         Schema::dropIfExists('rentals');
     }
 };
+

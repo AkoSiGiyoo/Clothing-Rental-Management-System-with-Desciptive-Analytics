@@ -32,11 +32,9 @@ class ManageClothingTest extends TestCase
             'clothing_category_id' => $category->id,
             'name' => 'Emerald Gown',
             'rental_price' => 1500,
-            'quantity' => 4,
             'color' => 'Green',
             'size' => 'M',
             'image' => UploadedFile::fake()->create('gown.jpg', 100, 'image/jpeg'),
-            'brand' => 'Atelier',
             'status' => 'available',
         ]);
 
@@ -49,7 +47,7 @@ class ManageClothingTest extends TestCase
         ]);
 
         $this->assertDatabaseHas('inventories', [
-            'quantity' => 4,
+            'quantity' => 0,
         ]);
 
         $item = ClothingItem::query()->first();
@@ -72,7 +70,6 @@ class ManageClothingTest extends TestCase
             'color' => 'White',
             'size' => 'S',
             'image_path' => UploadedFile::fake()->create('classic-gown.jpg', 100, 'image/jpeg')->store('clothing-items', 'public'),
-            'brand' => 'Maison',
             'status' => 'available',
         ]);
 
@@ -83,11 +80,9 @@ class ManageClothingTest extends TestCase
             'clothing_category_id' => $secondCategory->id,
             'name' => 'Modern Barong',
             'rental_price' => 1200,
-            'quantity' => 6,
             'color' => 'Ivory',
             'size' => 'L',
             'image' => UploadedFile::fake()->create('barong.jpg', 100, 'image/jpeg'),
-            'brand' => 'Heritage',
             'status' => 'reserved',
         ]);
 
@@ -102,7 +97,7 @@ class ManageClothingTest extends TestCase
 
         $this->assertDatabaseHas('inventories', [
             'clothing_item_id' => $item->id,
-            'quantity' => 6,
+            'quantity' => 2,
         ]);
 
         $item->refresh();
@@ -123,7 +118,6 @@ class ManageClothingTest extends TestCase
             'color' => null,
             'size' => null,
             'image_path' => UploadedFile::fake()->create('baro.jpg', 100, 'image/jpeg')->store('clothing-items', 'public'),
-            'brand' => null,
             'status' => 'maintenance',
         ]);
 

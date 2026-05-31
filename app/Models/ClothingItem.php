@@ -22,8 +22,11 @@ class ClothingItem extends Model
         'color',
         'size',
         'image_path',
-        'brand',
         'status',
+    ];
+
+    protected $attributes = [
+        'status' => 'available',
     ];
 
     protected function casts(): array

@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { Head, router, useForm } from "@inertiajs/vue3";
 import AdminNavbar from "../components/AdminNavbar.vue";
 import AdminSidebar from "../components/AdminSidebar.vue";
+import AppDataTable from "../components/AppDataTable.vue";
 import { buildAdminNavigation } from "../data/adminNavigation";
 
 const props = defineProps({
@@ -31,12 +32,12 @@ const editingId = ref(null);
 const search = ref(props.filters.search ?? "");
 const imagePreview = ref(null);
 const imageInput = ref(null);
+const brokenImageIds = ref(new Set());
 
 const emptyState = {
     clothing_category_id: "",
     name: "",
     rental_price: "",
-    quantity: 0,
     color: "",
     size: "",
     image: null,
@@ -46,16 +47,13 @@ const emptyState = {
 };
 
 const form = useForm({ ...emptyState });
-const categoryForm = useForm({
-    name: "",
-});
 
 const hasCategories = computed(() => props.categories.length > 0);
 const formTitle = computed(() => (editingId.value ? "Edit clothing item" : "Add clothing item"));
 const formDescription = computed(() =>
     editingId.value
-        ? "Update the selected clothing record, inventory quantity, and image."
-        : "Create a new clothing record, set its current stock, and upload an image.",
+        ? "Update the selected clothing record and image."
+        : "Create a new clothing record and upload an image.",
 );
 const imagePreviewLabel = computed(() => (editingId.value ? "Current image" : "Image preview"));
 
@@ -65,6 +63,15 @@ const statusClasses = {
     rented: "bg-slate-200 text-slate-700",
     maintenance: "bg-[rgba(178,74,45,0.16)] text-[var(--color-alert-500)]",
 };
+
+const clothingTableColumns = [
+    { key: "name", label: "Clothing", sortable: true },
+    { key: "image_url", label: "Photo", sortable: false },
+    { key: "category_name", label: "Category", sortable: true },
+    { key: "rental_price", label: "Rental Price", sortable: true },
+    { key: "status", label: "Availability", sortable: true },
+    { key: "actions", label: "Actions", sortable: false, align: "right" },
+];
 
 function resetForm() {
     form.defaults({ ...emptyState });
@@ -89,7 +96,6 @@ function openEdit(item) {
         clothing_category_id: item.category_id,
         name: item.name,
         rental_price: item.rental_price,
-        quantity: item.quantity,
         color: item.color ?? "",
         size: item.size ?? "",
         image: null,
@@ -111,8 +117,6 @@ function openEdit(item) {
 function closeForm() {
     formOpen.value = false;
     resetForm();
-    categoryForm.reset();
-    categoryForm.clearErrors();
 }
 
 function submit() {
@@ -133,16 +137,6 @@ function submit() {
     }
 
     form.transform((data) => data).post("/clothing", options);
-}
-
-function createCategory() {
-    categoryForm.post("/clothing-categories", {
-        preserveScroll: true,
-        onSuccess: () => {
-            categoryForm.reset();
-            categoryForm.clearErrors();
-        },
-    });
 }
 
 function updateImage(event) {
@@ -179,6 +173,10 @@ function removeItem(item) {
     router.delete(`/clothing/${item.id}`, {
         preserveScroll: true,
     });
+}
+
+function markImageBroken(itemId) {
+    brokenImageIds.value.add(itemId);
 }
 
 function applySearch() {
@@ -229,41 +227,6 @@ function applySearch() {
                 </div>
 
                 <form class="space-y-5 px-6 py-6" @submit.prevent="submit">
-                    <div
-                        v-if="!hasCategories"
-                        class="rounded-2xl border border-[var(--color-accent-500)]/25 bg-[rgba(209,139,47,0.08)] p-4"
-                    >
-                        <p class="text-sm font-semibold text-slate-900">Create a category first</p>
-                        <p class="mt-1 text-sm text-slate-600">
-                            Clothing items require a category. Add one here, then choose it in the form after the page refreshes.
-                        </p>
-
-                        <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start">
-                            <div class="min-w-0 flex-1">
-                                <input
-                                    v-model="categoryForm.name"
-                                    type="text"
-                                    class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[var(--color-brand-500)]"
-                                    placeholder="Category name"
-                                />
-                                <p
-                                    v-if="categoryForm.errors.name"
-                                    class="mt-2 text-sm text-[var(--color-alert-500)]"
-                                >
-                                    {{ categoryForm.errors.name }}
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                class="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-                                :disabled="categoryForm.processing"
-                                @click="createCategory"
-                            >
-                                Add category
-                            </button>
-                        </div>
-                    </div>
-
                     <div class="grid gap-5 sm:grid-cols-2">
                         <label class="block sm:col-span-2">
                             <span class="text-sm font-medium text-slate-700">Clothing name</span>
@@ -325,20 +288,6 @@ function applySearch() {
                             />
                             <p v-if="form.errors.rental_price" class="mt-2 text-sm text-[var(--color-alert-500)]">
                                 {{ form.errors.rental_price }}
-                            </p>
-                        </label>
-
-                        <label class="block">
-                            <span class="text-sm font-medium text-slate-700">Quantity</span>
-                            <input
-                                v-model="form.quantity"
-                                type="number"
-                                min="0"
-                                step="1"
-                                class="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[var(--color-brand-500)]"
-                            />
-                            <p v-if="form.errors.quantity" class="mt-2 text-sm text-[var(--color-alert-500)]">
-                                {{ form.errors.quantity }}
                             </p>
                         </label>
 
@@ -519,81 +468,77 @@ function applySearch() {
                         </div>
 
                         <div v-if="clothingItems.length" class="mt-6 overflow-hidden rounded-[24px] border border-slate-200 bg-white">
-                            <div class="overflow-x-auto">
-                                <table class="min-w-full divide-y divide-slate-200">
-                                    <thead class="bg-slate-50">
-                                        <tr class="text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                            <th class="px-5 py-4">Item</th>
-                                            <th class="px-5 py-4">Image</th>
-                                            <th class="px-5 py-4">Category</th>
-                                            <th class="px-5 py-4">Price</th>
-                                            <th class="px-5 py-4">Stock</th>
-                                            <th class="px-5 py-4">Status</th>
-                                            <th class="px-5 py-4">Added</th>
-                                            <th class="px-5 py-4 text-right">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-slate-200">
-                                        <tr v-for="item in clothingItems" :key="item.id" class="align-top">
-                                            <td class="px-5 py-4">
-                                                <p class="font-semibold text-slate-900">{{ item.name }}</p>
-                                                <p class="mt-1 text-sm text-slate-500">
-                                                    {{ item.brand || "No brand" }}
-                                                    <span v-if="item.color || item.size">
-                                                        · {{ item.color || "No color" }} / {{ item.size || "No size" }}
-                                                    </span>
-                                                </p>
-                                            </td>
-                                            <td class="px-5 py-4">
-                                                <div class="h-16 w-16 overflow-hidden rounded-2xl bg-slate-100">
-                                                    <img
-                                                        v-if="item.image_url"
-                                                        :src="item.image_url"
-                                                        :alt="item.name"
-                                                        class="h-full w-full object-cover"
-                                                    >
-                                                    <div
-                                                        v-else
-                                                        class="flex h-full w-full items-center justify-center text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400"
-                                                    >
-                                                        No image
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td class="px-5 py-4 text-sm text-slate-600">{{ item.category_name }}</td>
-                                            <td class="px-5 py-4 text-sm font-medium text-slate-900">PHP {{ item.rental_price }}</td>
-                                            <td class="px-5 py-4 text-sm text-slate-600">{{ item.quantity }}</td>
-                                            <td class="px-5 py-4">
-                                                <span
-                                                    class="inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize"
-                                                    :class="statusClasses[item.status]"
-                                                >
-                                                    {{ item.status }}
-                                                </span>
-                                            </td>
-                                            <td class="px-5 py-4 text-sm text-slate-500">{{ item.created_at }}</td>
-                                            <td class="px-5 py-4">
-                                                <div class="flex justify-end gap-2">
-                                                    <button
-                                                        type="button"
-                                                        class="rounded-full border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700"
-                                                        @click="openEdit(item)"
-                                                    >
-                                                        Edit
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        class="rounded-full border border-[var(--color-alert-500)]/30 px-3 py-2 text-sm font-semibold text-[var(--color-alert-500)]"
-                                                        @click="removeItem(item)"
-                                                    >
-                                                        Delete
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
+                            <AppDataTable
+                                :items="clothingItems"
+                                :columns="clothingTableColumns"
+                                initial-sort-key="name"
+                            >
+                                <template #cell-name="{ item }">
+                                    <div class="text-left">
+                                        <p class="font-semibold text-slate-900">{{ item.name }}</p>
+                                        <p class="mt-1 text-sm text-slate-500">
+                                            {{ item.brand || "No brand" }}
+                                            <span v-if="item.color || item.size">
+                                                - {{ item.color || "No color" }} / {{ item.size || "No size" }}
+                                            </span>
+                                        </p>
+                                    </div>
+                                </template>
+
+                                <template #cell-image_url="{ item }">
+                                    <div class="h-16 w-16 overflow-hidden rounded-2xl bg-slate-100">
+                                        <img
+                                            v-if="item.image_url && !brokenImageIds.has(item.id)"
+                                            :src="item.image_url"
+                                            :alt="item.name"
+                                            class="h-full w-full object-cover"
+                                            @error="markImageBroken(item.id)"
+                                        >
+                                        <div
+                                            v-else
+                                            class="flex h-full w-full items-center justify-center text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400"
+                                        >
+                                            No image
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <template #cell-category_name="{ item }">
+                                    <span class="text-sm text-slate-600">{{ item.category_name }}</span>
+                                </template>
+
+                                <template #cell-rental_price="{ item }">
+                                    <span class="text-sm font-medium text-slate-900">PHP {{ item.rental_price }}</span>
+                                </template>
+
+                                <template #cell-status="{ item }">
+                                    <span
+                                        class="inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize"
+                                        :class="statusClasses[item.status]"
+                                    >
+                                        {{ item.status }}
+                                    </span>
+                                </template>
+
+                                <template #cell-actions="{ item }">
+                                    <div class="flex justify-end gap-2">
+                                        <button
+                                            type="button"
+                                            class="rounded-full border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700"
+                                            @click="openEdit(item)"
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="rounded-full border border-[var(--color-alert-500)]/30 px-3 py-2 text-sm font-semibold text-[var(--color-alert-500)]"
+                                            @click="removeItem(item)"
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                </template>
+                            </AppDataTable>
                         </div>
 
                         <div

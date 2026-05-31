@@ -21,7 +21,6 @@ return new class extends Migration
             $table->string('color')->nullable();
             $table->string('size', 20)->nullable();
             $table->string('image_path')->nullable();
-            $table->string('brand')->nullable();
             $table->enum('status', ['available', 'reserved', 'rented', 'maintenance'])->default('available');
             $table->timestamps();
 

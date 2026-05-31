@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { Head, router, useForm } from "@inertiajs/vue3";
 import AdminNavbar from "../components/AdminNavbar.vue";
 import AdminSidebar from "../components/AdminSidebar.vue";
+import AppDataTable from "../components/AppDataTable.vue";
 import { buildAdminNavigation } from "../data/adminNavigation";
 
 const props = defineProps({
@@ -36,6 +37,13 @@ const subtitle = computed(() =>
         ? "Update the category name used by clothing records."
         : "Create categories such as Barong or Filipiniana for your clothing catalog.",
 );
+
+const categoryTableColumns = [
+    { key: "name", label: "Category", sortable: true },
+    { key: "clothing_items_count", label: "Clothing items", sortable: true },
+    { key: "created_at", label: "Created", sortable: true },
+    { key: "actions", label: "Actions", sortable: false, align: "right" },
+];
 
 function resetForm() {
     form.defaults({ name: "" });
@@ -240,53 +248,43 @@ function applySearch() {
                         </div>
 
                         <div v-if="categories.length" class="mt-6 overflow-hidden rounded-[24px] border border-slate-200 bg-white">
-                            <div class="overflow-x-auto">
-                                <table class="min-w-full divide-y divide-slate-200">
-                                    <thead class="bg-slate-50">
-                                        <tr class="text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                            <th class="px-5 py-4">Category</th>
-                                            <th class="px-5 py-4">Clothing items</th>
-                                            <th class="px-5 py-4">Created</th>
-                                            <th class="px-5 py-4 text-right">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-slate-200">
-                                        <tr v-for="category in categories" :key="category.id">
-                                            <td class="px-5 py-4">
-                                                <p class="font-semibold text-slate-900">{{ category.name }}</p>
-                                            </td>
-                                            <td class="px-5 py-4 text-sm text-slate-600">
-                                                {{ category.clothing_items_count }}
-                                            </td>
-                                            <td class="px-5 py-4 text-sm text-slate-500">
-                                                {{ category.created_at }}
-                                            </td>
-                                            <td class="px-5 py-4">
-                                                <div class="flex justify-end gap-2">
-                                                    <button
-                                                        type="button"
-                                                        class="rounded-full border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700"
-                                                        @click="openEdit(category)"
-                                                    >
-                                                        Edit
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        class="rounded-full border px-3 py-2 text-sm font-semibold"
-                                                        :class="category.clothing_items_count > 0
-                                                            ? 'cursor-not-allowed border-slate-200 text-slate-400'
-                                                            : 'border-[var(--color-alert-500)]/30 text-[var(--color-alert-500)]'"
-                                                        :disabled="category.clothing_items_count > 0"
-                                                        @click="removeCategory(category)"
-                                                    >
-                                                        Delete
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
+                            <AppDataTable
+                                :items="categories"
+                                :columns="categoryTableColumns"
+                                initial-sort-key="name"
+                            >
+                                <template #cell-name="{ item }">
+                                    <p class="font-semibold text-slate-900 text-left">{{ item.name }}</p>
+                                </template>
+                                <template #cell-clothing_items_count="{ item }">
+                                    <span class="text-sm text-slate-600">{{ item.clothing_items_count }}</span>
+                                </template>
+                                <template #cell-created_at="{ item }">
+                                    <span class="text-sm text-slate-500">{{ item.created_at }}</span>
+                                </template>
+                                <template #cell-actions="{ item }">
+                                    <div class="flex justify-end gap-2">
+                                        <button
+                                            type="button"
+                                            class="rounded-full border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700"
+                                            @click="openEdit(item)"
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="rounded-full border px-3 py-2 text-sm font-semibold"
+                                            :class="item.clothing_items_count > 0
+                                                ? 'cursor-not-allowed border-slate-200 text-slate-400'
+                                                : 'border-[var(--color-alert-500)]/30 text-[var(--color-alert-500)]'"
+                                            :disabled="item.clothing_items_count > 0"
+                                            @click="removeCategory(item)"
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                </template>
+                            </AppDataTable>
                         </div>
 
                         <div
